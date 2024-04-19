@@ -1,6 +1,7 @@
 import pandas as pd
 import sys
 import json
+from datetime import datetime as dt
 
 #Add a new child to the database.
 def add_new_kid(path, value):
@@ -29,21 +30,38 @@ def delete_kid(path, kid):
 def change_status(path, kid):
     kids_df = pd.read_excel(path, sheet_name="Kids")
     log_df = pd.read_excel(path, sheet_name="Log")
+    
+    # Kid ID
     kid = int(kid)
+    # Kid Name
+    name = kids_df[kids_df["ID"] == kid]['Name'][0]
+
     #Make sure the ID exists in our database, otherwise we have to tell the user it doesn't exist
     if kid not in kids_df['ID'].values:
         return json.dumps({ "result" : "This ID does not exist in the database."})
     
+    # The new status will be put here
+    status = ''
     kid_index = kids_df[kids_df["ID"] == kid].index
+    
     #If the childs status = In, change it to Out
     if kids_df.at[kid_index[0], 'Status'] == 'In':
-        kids_df.at[kid_index[0], 'Status'] = 'Out'
+        kids_df.at[kid_index[0], 'Status'] = status = 'Out'
+
         
     #If the childs status = Out, change it to In
     elif kids_df.at[kid_index[0], 'Status'] == 'Out':
-        kids_df.at[kid_index[0], 'Status'] = 'In'
+        kids_df.at[kid_index[0], 'Status'] = status = 'In'
+
+    # Append the status change to the end of the Log
+    new_row = pd.DataFrame({ 'ID': [kid],'Name' : [name], 'Status': [status], 'Timestamp': [dt.now().strftime('%Y-%m-%d %H:%M:%S')]})
+    log_df = pd.concat([log_df, new_row], ignore_index=True)
     
-    kids_df.to_excel(path, index=False)
+    # Save changes back to the Excel file
+    with pd.ExcelWriter(path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+        kids_df.to_excel(writer, sheet_name='Kids', index=False)
+        log_df.to_excel(writer, sheet_name='Log', index=False)
+
     #return kids_df.to_json()
     return json.dumps({"result" : {
             'Name' : kids_df.at[kid_index[0], 'Name'],
