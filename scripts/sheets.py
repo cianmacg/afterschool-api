@@ -34,7 +34,6 @@ def change_status(path, kid):
     # Kid ID
     kid = int(kid)
     # Kid Name
-    name = kids_df[kids_df["ID"] == kid]['Name'][0]
 
     #Make sure the ID exists in our database, otherwise we have to tell the user it doesn't exist
     if kid not in kids_df['ID'].values:
@@ -43,6 +42,7 @@ def change_status(path, kid):
     # The new status will be put here
     status = ''
     kid_index = kids_df[kids_df["ID"] == kid].index
+    name = kids_df.at[kid_index[0], 'Name']
     
     #If the childs status = In, change it to Out
     if kids_df.at[kid_index[0], 'Status'] == 'In':
@@ -71,7 +71,10 @@ def change_status(path, kid):
 
 #Return a list of all children in the database and their statuses.
 def get_kids(path):
-    return pd.read_excel(path).to_json(orient = "records")
+    return pd.read_excel(path, sheet_name="Kids").to_json(orient = "records")
+
+def get_log(path):
+    return pd.read_excel(path, sheet_name="Log").to_json(orient="records")
 
 if __name__ == "__main__":
     try:
@@ -110,6 +113,9 @@ if __name__ == "__main__":
         
     elif to_do == "get_kids":
         print(get_kids(path))
+        
+    elif to_do == "get_log":
+        print(get_log(path))
         
     else:
         print(json.dumps({ "result" : "Unknown function name." }))

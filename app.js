@@ -63,8 +63,8 @@ app.post('/change', (req, res) => {
   }
 });
 
-// This path is used to get a list of all children and their statuses. 
-app.get('/get', (req, res) => {
+// This path is used to get a list of all children and their current statuses. 
+app.get('/get_kids', (req, res) => {
   var data = {
     'title' : 'Express',
     'kids' : ''
@@ -77,6 +77,22 @@ app.get('/get', (req, res) => {
     res.json(data);
   });
 });
+
+// This path is used to get a list of all status change logs. 
+app.get('/get_log', (req, res) => {
+  var data = {
+    'title' : 'Express',
+    'kids' : ''
+  }
+  get_log(spawn('python', [sheets_py, "get_log", sheets_path.concat("kids.xlsx")]), (err, log) => {
+    if (err) {
+        return res.status(500).send("Error retrieving data");
+    }
+    data.log = log;
+    res.json(data);
+  });
+});
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -166,6 +182,23 @@ function get_kids(kid, cb) {
   });
   
   kid.on('close', (code) => {
+    console.log(`child process exited with code ${code}`);
+  });
+};
+
+function get_log(logs, cb) {
+  logs.stdout.on('data', (data) => {
+    // Assuming the Python script returns JSON
+    const result = JSON.parse(data);
+    return cb(null, result);
+  });
+  
+  logs.stderr.on('data', (data) => {
+    console.error(`stderr: ${data}`);
+    return { "result" : "Error.", "ID" : "", "Name" : "", "Status" : "", "Timestamp" : "" };
+  });
+  
+  logs.on('close', (code) => {
     console.log(`child process exited with code ${code}`);
   });
 };
