@@ -9,7 +9,9 @@ def add_new_kid(path, value):
     
     id = pd.to_numeric(kids_df['ID'].iloc[-1]) + 1
     kids_df.loc[len(kids_df.index)] = [id, value, 'Out']
-    kids_df.to_excel(path, index=False)
+    # Save changes back to the Excel file
+    with pd.ExcelWriter(path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+        kids_df.to_excel(writer, sheet_name='Kids', index=False)
     #return json.dumps({"result" : kids_df.iloc[-1].to_json() })
     return kids_df.to_json()
 
@@ -22,7 +24,9 @@ def delete_kid(path, kid):
         return json.dumps({ 'result' : 'Unable to delete. ID does not exist.'})
     
     kids_df.drop(kids_df[kids_df['ID'] == kid].index, inplace=True)
-    kids_df.to_excel(path, index=False)
+    # Save changes back to the Excel file
+    with pd.ExcelWriter(path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+        kids_df.to_excel(writer, sheet_name='Kids', index=False)
     
     return kids_df.to_json()
 
@@ -73,6 +77,7 @@ def change_status(path, kid):
 def get_kids(path):
     return pd.read_excel(path, sheet_name="Kids").to_json(orient = "records")
 
+#Return all the logs of status changes.
 def get_log(path):
     return pd.read_excel(path, sheet_name="Log").to_json(orient="records")
 

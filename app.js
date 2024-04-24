@@ -19,7 +19,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // This path is used to add a new child to the database. It must be provided with a Name
-app.post('/add', (req, res) => {
+app.put('/add', (req, res) => {
   if(req.query.name == "" || req.query.name == null){
     res.sendStatus(422);
   }
@@ -34,7 +34,7 @@ app.post('/add', (req, res) => {
 });
 
 //This path is used to remove a child from the database. It must be provided with an ID
-app.post('/delete', (req, res) => {
+app.put('/delete', (req, res) => {
   if(req.query.id == "" || req.query.id == null){
     res.sendStatus(422);
   }
@@ -49,7 +49,7 @@ app.post('/delete', (req, res) => {
 });
 
 // This path is used to change the status of a child to In or Out (opposite of current status). It must be provided with an ID
-app.post('/change', (req, res) => { 
+app.put('/change', (req, res) => { 
   if(req.query.id == "" || req.query.id == null){
     res.sendStatus(422);
   }
@@ -105,9 +105,9 @@ app.use(function(err, req, res, next) {
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-  // render the error page
+  // send a JSON response
   res.status(err.status || 500);
-  res.render('error');
+  res.json({ error: err.message });
 });
 
 // We use this function to add a new child to the database.
