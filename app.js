@@ -8,7 +8,7 @@ const { spawn } = require('child_process');
 const math_py = 'scripts/math-stuff.py'
 const sheets_py = 'scripts/sheets.py'
 
-const sheets_path = __dirname + '\\public\\sheets\\';
+const sheets_path = __dirname + '/public/sheets/';
 
 var app = express();
 
