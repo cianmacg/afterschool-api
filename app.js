@@ -82,7 +82,7 @@ app.get('/get_kids', (req, res) => {
 app.get('/get_log', (req, res) => {
   var data = {
     'title' : 'Express',
-    'kids' : ''
+    'log' : ''
   }
   get_log(spawn('python', [sheets_py, "get_log", sheets_path.concat("kids.xlsx")]), (err, log) => {
     if (err) {
