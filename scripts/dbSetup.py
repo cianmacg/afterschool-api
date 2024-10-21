@@ -14,22 +14,29 @@ createKids = """CREATE TABLE IF NOT EXISTS
 kids(kid_id INTEGER UNIQUE PRIMARY KEY NOT NULL, first_name TEXT, last_name TEXT, status TEXT)"""
 
 createGuardians = """CREATE TABLE IF NOT EXISTS
-guardians(guardian_id INTEGER UNIQUE PRIMARY KEY NOT NULL, kid_id INTEGER, name TEXT, phone TEXT, email TEXT, address TEXT, relationship TEXT, FOREIGN KEY(kid_id) REFERENCES kids(kid_id))"""
+guardians(guardian_id INTEGER NOT NULL, kid_id INTEGER NOT NULL, name TEXT, phone TEXT, email TEXT, address TEXT, relationship TEXT, FOREIGN KEY(kid_id) REFERENCES kids(kid_id), CONSTRAINT PK_guardian PRIMARY KEY (guardian_id, kid_id) )"""
 
 createLogs = """CREATE TABLE IF NOT EXISTS
 logs(log_id INTEGER UNIQUE PRIMARY KEY NOT NULL, kid_id INTEGER, status TEXT, timestamp TEXT, FOREIGN KEY(kid_id) REFERENCES kids(kid_id))"""
 
-cursor.execute(createKids)
-cursor.execute(createGuardians)
-cursor.execute(createLogs)
+# cursor.execute(createKids)
+# cursor.execute(createGuardians)
+# cursor.execute(createLogs)
 
-cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Cian', 'Smith', 'Out')")
-cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Aoibhinn', 'Smith', 'Out')")
-cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Oisin', 'Smith', 'Out')")
-cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Mark', 'Wallace', 'Out')")
-cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Marcus', 'Yamamoto', 'Out')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Cian', 'Smith', 'Out')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Aoibhinn', 'Smith', 'Out')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Oisin', 'Smith', 'Out')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Mark', 'Wallace', 'Out')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Marcus', 'Yamamoto', 'Out')")
 
-print(cursor.execute("SELECT * FROM kids").fetchall())
+# print(cursor.execute("SELECT * FROM kids").fetchall())
+
+# cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (1, 1,'Noeleen Smith', '08981736487', 'noeleensmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
+# cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (1, 2,'Noeleen Smith', '08981736487', 'noeleensmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
+# cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (1, 3,'Noeleen Smith', '08981736487', 'noeleensmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
+# cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (2, 1,'Paul Smith', '0918374562', 'paulsmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
+# cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (2, 2,'Paul Smith', '0918374562', 'paulsmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
+# cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (2, 3,'Paul Smith', '0918374562', 'paulsmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
 
 cursor.close()
 connection.commit()
