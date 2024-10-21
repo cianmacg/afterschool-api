@@ -37,10 +37,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(cors({
-  origin: 'http://localhost:4173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE']
-}));
+
+// Might not need to use cross-ogirin stuff. Commented out for now.
+// app.use(cors({
+//   origin: 'http://localhost:4173',
+//   methods: ['GET', 'POST', 'PUT', 'DELETE']
+// }));
 
 // When we want to get all Kids data, we use this path.
 app.get('/get_kids', (req, res) => {
@@ -132,6 +134,106 @@ app.get('/get_guardian_by_id', (req, res) => {
   });
 });
 
+// When we want to add a new kid, we use this path. Required - first name, last name. Optionally, we can include a guardian at this stage. <--- LAST PART NEEDS TO BE ADDED.
+app.post('/add_kid', (req, res) => {
+  if (!req.query.first_name || !req.query.last_name) {
+    console.log('Insufficient data to create new kid. First name or Last name is missing.');
+    res.status(500).json({ error: 'Missing data. First Name or Last Name is missing.' });
+  }
+  else {
+    db.run('INSERT INTO kids (first_name, last_name, status) VALUES (?, ?, \'Out\')', [req.query.first_name, req.query.last_name], (err) => {
+      if (err) {
+        console.error('Error inserting data to kids.', err.message);
+        res.status(500).json({ error: 'An error occured when trying to insert the data to the database.' });
+      }
+      else {
+        res.json({ success: 'Kid successfully added to the database.' })
+      }
+    })
+  }
+});
+
+// When we want to change the status of a kid (create a NEW LOG), we use this path. It requires the kid ID.
+app.post('/change_kid_status', (req, res) => {
+  if (!req.query.id) res.status(500).json({ error: 'Missing kid ID. Cannot change status.' });
+  else {
+    res.json({ success: 'Kid status successfully updated.' }) // THIS NEEDS TO BE DONE. TO DO TO DO TO DO TO DO TO DO TO DO
+  }
+});
+
+// When we want to add a new guardian, we use this path. It requires the associated kid id, name, phone number, email address, home address, and relationship to the kid.
+// Optionally, if the guardian already exists (i.e. already the guardian of another kid), we can include the guardian ID also.
+app.post('/add_guardian', (req, res) => {
+  const { guardian_id, kid_id, name, phone, email, address, relationship } = req.query;
+
+  if (!kid_id || !name || !phone || !email || !address || !relationship) {
+    return res.status(500).json({ error: 'Insufficient data provided. Please include kid ID, name, phone number, email address, home address, and relationship.' })
+  }
+  else {
+    if (guardian_id) {
+      add_guardian([guardian_id, kid_id, name, phone, email, address, relationship], res, false);
+    }
+    // If we aren't given an ID for the guardian, we need to find one for them. To do this, we find the current highest guardian ID, and add 1.
+    else {
+      // We need to use locking/serialization to avoid race conditions. It is possible that 2 guardians could be made at the same time, and be given the same ID otherwise.
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION;', (err) => {
+          if (err) {
+            console.error('Error beginning transaction:', err.message);
+            return res.status(500).json({ error: 'An error occurred when beginning the transaction with the database.' });
+          }
+
+          db.get('SELECT MAX(guardian_id) AS maxGuardianId FROM guardians', [], (err, row) => {
+            if (err) {
+              console.error('Error fetching MAX guardian id.', err.message);
+              db.run('ROLLBACK;', (rollbackErr) => {
+                if (rollbackErr) console.error('Error rolling back transaction:', rollbackErr.message);
+              });
+              return res.status(500).json({ error: 'An error occurred when obtaining the new guardian ID.' })
+            }
+            else {
+              let newGuardianId = row.maxGuardianId + 1;
+              add_guardian([newGuardianId, kid_id, name, phone, email, address, relationship], res, true);
+            }
+          });
+        });
+      });
+    }
+  }
+});
+
+
+// Since we can add a guardian from multiple paths ('/add_kid' and '/add_guardian' x2), it is easier to create a function here to be used by them.
+// We should have handled any issues with the request BEFORE calling this function.
+// When we are dealing with a new guardian ID, we need to use locks to prevent 2 race conditions. is_locked is set to true when using a new guardian ID.
+function add_guardian(params, res, is_locked) {
+  db.run('INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (?, ?, ?, ?, ?, ?, ?)', params, (err) => {
+    if (err) {
+      console.error('Error inserting data to database.', err.message);
+      if (is_locked) {
+        db.run('ROLLBACK;', (rollbackErr) => {
+          if (rollbackErr) console.error('Error rolling back transaction:', rollbackErr.message);
+        });
+      }
+      res.status(500).json({ error: 'An error occured while inserting data into the database.' })
+    }
+    else {
+      if (is_locked) {
+        db.run('COMMIT;', (commitErr) => {
+          if (commitErr) {
+            console.error('Error committing transaction:', commitErr.message);
+            res.status(500).json({ error: 'An error occurred while commiting the transaction.' })
+          }
+          else res.json({ success: 'Guardian successfully added to the database.' })
+        });
+      }
+      else {
+        res.json({ success: 'Guardian successfully added to the database.' })
+      }
+    }
+  });
+}
+
 
 /*
 *   This stuff is no longer used, as we are migrating away from the python scripts. 
@@ -210,24 +312,7 @@ app.get('/get_guardian_by_id', (req, res) => {
 //     res.json(data);
 //   });
 // });
-
-
-// // catch 404 and forward to error handler
-// app.use(function(req, res, next) {
-//   next(createError(404));
-// });
-
-// // error handler
-// app.use(function(err, req, res, next) {
-//   // set locals, only providing error in development
-//   res.locals.message = err.message;
-//   res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-//   // send a JSON response
-//   res.status(err.status || 500);
-//   res.json({ error: err.message });
-// });
-
+//
 // // We use this function to add a new child to the database.
 // function add_new_kid(kid, cb) {
 
@@ -321,4 +406,23 @@ app.get('/get_guardian_by_id', (req, res) => {
 //   });
 // };
 
+// catch 404 and forward to error handler
+app.use(function (req, res, next) {
+  next(createError(404));
+});
+
+// error handler
+app.use(function (err, req, res, next) {
+  // set locals, only providing error in development
+  res.locals.message = err.message;
+  res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+  // send a JSON response
+  res.status(err.status || 500);
+  res.json({ error: err.message });
+});
+
 module.exports = app;
+
+
+Anywhere, Anyplace, Washington, USA
