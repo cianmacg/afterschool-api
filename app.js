@@ -19,7 +19,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors({
-  origin: 'https://9000-monospace-afterschool-website-1715006128829.cluster-4ezwrnmkojawstf2k7vqy36oe6.cloudworkstations.dev',
+  origin: 'http://localhost:4173',
   methods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
 
@@ -71,7 +71,6 @@ app.put('/change', (req, res) => {
 // This path is used to get a list of all children and their current statuses. 
 app.get('/get_kids', (req, res) => {
   var data = {
-    'title' : 'Express',
     'kids' : ''
   }
   get_kids(spawn('python', [sheets_py, "get_kids", sheets_path.concat("kids.xlsx")]), (err, kids) => {
@@ -84,9 +83,8 @@ app.get('/get_kids', (req, res) => {
 });
 
 // This path is used to get a list of all status change logs. 
-app.get('/get_log', (req, res) => {
+app.get('/get_logs', (req, res) => {
   var data = {
-    'title' : 'Express',
     'log' : ''
   }
   get_log(spawn('python', [sheets_py, "get_log", sheets_path.concat("kids.xlsx")]), (err, log) => {
