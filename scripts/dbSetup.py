@@ -6,28 +6,28 @@ import sqlite3
 connection = sqlite3.connect('../data.db')
 cursor = connection.cursor()
 
-# cursor.execute("DROP TABLE kids")
+cursor.execute("DROP TABLE kids")
 # cursor.execute("DROP TABLE guardians")
 # cursor.execute("DROP TABLE logs")
 
 createKids = """CREATE TABLE IF NOT EXISTS
-kids(kid_id INTEGER UNIQUE PRIMARY KEY NOT NULL, first_name TEXT, last_name TEXT, status TEXT)"""
+kids(kid_id INTEGER UNIQUE PRIMARY KEY NOT NULL, first_name TEXT, last_name TEXT, dob TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"""
 
 createGuardians = """CREATE TABLE IF NOT EXISTS
 guardians(guardian_id INTEGER NOT NULL, kid_id INTEGER NOT NULL, name TEXT, phone TEXT, email TEXT, address TEXT, relationship TEXT, FOREIGN KEY(kid_id) REFERENCES kids(kid_id), CONSTRAINT PK_guardian PRIMARY KEY (guardian_id, kid_id) )"""
 
 createLogs = """CREATE TABLE IF NOT EXISTS
-logs(log_id INTEGER UNIQUE PRIMARY KEY NOT NULL, kid_id INTEGER, status TEXT, timestamp TEXT, FOREIGN KEY(kid_id) REFERENCES kids(kid_id))"""
+logs(log_id INTEGER UNIQUE PRIMARY KEY NOT NULL, kid_id INTEGER, status TEXT, timestamp TIMESTAMP DEFUALT CURRENT_TIMESTAMP, FOREIGN KEY(kid_id) REFERENCES kids(kid_id))"""
 
-# cursor.execute(createKids)
+cursor.execute(createKids)
 # cursor.execute(createGuardians)
 # cursor.execute(createLogs)
 
-# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Cian', 'Smith', 'Out')")
-# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Aoibhinn', 'Smith', 'Out')")
-# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Oisin', 'Smith', 'Out')")
-# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Mark', 'Wallace', 'Out')")
-# cursor.execute("INSERT INTO kids(first_name, last_name, status) VALUES ('Marcus', 'Yamamoto', 'Out')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, dob) VALUES ('Cian', 'Smith', '25-01-1994')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, dob) VALUES ('Aoibhinn', 'Smith', '14-12-1996')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, dob) VALUES ('Oisin', 'Smith', '31-08-2000')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, dob) VALUES ('Mark', 'Wallace', '4-5-1985')")
+# cursor.execute("INSERT INTO kids(first_name, last_name, dob) VALUES ('Marcus', 'Yamamoto', '25-09-1997')")
 
 # print(cursor.execute("SELECT * FROM kids").fetchall())
 
