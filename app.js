@@ -44,6 +44,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 //   methods: ['GET', 'POST', 'PUT', 'DELETE']
 // }));
 
+/*
+*
+*   GETTER PATHS
+*
+*/
+
 // When we want to get all Kids data, we use this path.
 app.get('/get_kids', (req, res) => {
   db.all('SELECT * FROM kids', [], (err, rows) => {
@@ -134,6 +140,12 @@ app.get('/get_guardian_by_id', (req, res) => {
   });
 });
 
+/*
+*
+*   INSERTER PATHS
+*
+*/
+
 // When we want to add a new kid, we use this path. Required - first name, last name. Optionally, we can include a guardian at this stage. <--- LAST PART NEEDS TO BE ADDED.
 app.post('/add_kid', (req, res) => {
   if (!req.query.first_name || !req.query.last_name) {
@@ -202,6 +214,131 @@ app.post('/add_guardian', (req, res) => {
   }
 });
 
+/*
+*
+*   UPDATER PATHS
+*
+*/
+
+// When we want to update the details of a kid, we use this path.
+app.patch('/update_kid', (req, res) => {
+  const { kid_id, first_name, last_name, status } = req.query;
+
+  // We need a kid id to perform this task. If none is provided, end here.
+  if (!kid_id) {
+    console.log('Error Updating. No kid ID provided.');
+    return res.status(400).json({ error: 'Error updating kid. No kid ID received.' })
+  }
+
+  // The query should look like 'UPDATE kids SET [fields = params] WHERE kid_id = [kid_id]'
+  let sqlQuery = 'UPDATE kids SET '
+  const fields = [];
+  const params = [];
+
+  // We first need to determine which fields are going to be updated. Only fields which were given to us in the request should be included.
+  if (first_name) {
+    params.push(first_name);
+    fields.push('first_name = ?');
+  }
+
+  if (last_name) {
+    params.push(last_name);
+    fields.push('last_name = ?');
+  }
+
+  if (status) {
+    params.push(status);
+    fields.push('status = ?')
+  }
+
+  // If there are no fields which we are going to update, end here.
+  if (fields.length === 0) {
+    console.log('Error updating kid. No values to update.')
+    return res.status(400).json({ error: 'Error updating kid. No valid fields received.' })
+  }
+
+  sqlQuery += fields.join(', ');
+  sqlQuery += ' WHERE kid_id = ?';
+  params.push(kid_id);
+
+  console.log(sqlQuery);
+  console.log(params);
+
+  // Time to run the query. 
+  // It is possible 2 people may try to update the same kid at the same time. We need to be ready for this.
+  // Using serialize and transactions should protect us from this.
+  db.serialize(() => {
+    // Begin the transaction
+    db.run('BEGIN TRANSACTION;', (err) => {
+      if (err) {
+        console.error('Error beginning transaction.', err.message);
+        return res.status(500).json({ error: 'An error occurred when beginning the transaction.' });
+      }
+
+      // Perform the update here.
+      db.run(sqlQuery, params, function (err) {
+        if (err) {
+          console.error('Error updating kid information in database.', err.message);
+          // If an error happened while we tried to update the information, we need to perform a rollback.
+          db.run('ROLLBACK;', rollbackErr => {
+            // If the rollback has failed, log it.
+            if (rollbackErr) {
+              console.error('Error during rollback: ', rollbackErr.message);
+            }
+          });
+          return res.status(500).json({ error: 'Error updating kids information on database.' })
+        }
+
+        // We need to commit the transaction.
+        db.run('COMMIT;', (commitErr) => {
+          if (commitErr) {
+            console.error('Error committing transaction: ', commitErr.message);
+            return res.status(500).json({ error: 'Error committing transaction.' });
+          }
+
+          // Check the changes parameter of the returned object to make sure a row was updated.
+          if (this.changes > 0) {
+            return res.json({ success: 'Kid information successfully updated.' })
+          }
+          else {
+            return res.status(404).json({ error: 'No record found matching provided kid ID.' })
+          }
+        });
+      });
+    });
+  });
+});
+
+// When we want to update the details of a log, we use this path.
+app.patch('/update_log', (req, res) => {
+
+});
+
+// When we want to update the details of a guardian, we use this path.
+app.patch('/update_guadian', (req, res) => {
+
+});
+
+/*
+*
+*   DELETER PATHS
+*
+*/
+
+// When we want to remove a kid from the database, we use this path.
+app.delete('/remove_kid', (req, res) => {
+
+});
+
+// When we want to remove a log from the database, we use this path.
+app.delete('/remove_log', (req, res) => {
+
+});
+
+// When we want to remove a guardian from the database, we use this path.
+app.delete('/remove_guardian', (req, res) => {
+
+});
 
 // Since we can add a guardian from multiple paths ('/add_kid' and '/add_guardian' x2), it is easier to create a function here to be used by them.
 // We should have handled any issues with the request BEFORE calling this function.
@@ -423,6 +560,3 @@ app.use(function (err, req, res, next) {
 });
 
 module.exports = app;
-
-
-Anywhere, Anyplace, Washington, USA
