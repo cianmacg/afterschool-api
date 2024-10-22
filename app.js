@@ -55,7 +55,7 @@ app.get('/get_kids', (req, res) => {
   db.all('SELECT * FROM kids', [], (err, rows) => {
     if (err) {
       console.error('Error fetching data from Database: Kids.', err.message);
-      res.status(500).json({ error: 'An error occurred while fetching data.' });
+      return res.status(500).json({ error: 'An error occurred while fetching data.' });
     }
     else res.json(rows);
   });
@@ -66,7 +66,7 @@ app.get('/get_logs', (req, res) => {
   db.all('SELECT * FROM logs', [], (err, rows) => {
     if (err) {
       console.error('Error fetching data from Logs.', err.message);
-      res.status(500).json({ error: 'An error occurred while fetching data.' });
+      return res.status(500).json({ error: 'An error occurred while fetching data.' });
     }
     else res.json(rows);
   });
@@ -77,7 +77,7 @@ app.get('/get_guardians', (req, res) => {
   db.all('SELECT * FROM guardians', [], (err, rows) => {
     if (err) {
       console.error('Error fetching the data from Guardians.', err.message);
-      res.status(500).json({ error: 'An error occurred while fetching data.' });
+      return res.status(500).json({ error: 'An error occurred while fetching data.' });
     }
     else res.json(rows);
   });
@@ -85,12 +85,13 @@ app.get('/get_guardians', (req, res) => {
 
 // When we want to get A SPECIFIC KID'S data, we use this path. It requires the ID of the kid.
 app.get('/get_kid_by_id', (req, res) => {
+  const { kid_id } = req.query;
   // Using '?' here and passing the ID value in later (in the db.all function) should help protect against SQL Injection attacks later.
-  db.all('SELECT * FROM kids WHERE kid_id = ?', [req.query.id], (err, rows) => {
+  db.all('SELECT * FROM kids WHERE kid_id = ?', [kid_id], (err, rows) => {
     if (err) {
       // If an error occurs, print to console and inform the user.
-      console.error('Error fetching data of Kid ID: ' + req.query.id, err.message);
-      res.status(500).json({ error: 'An error occurred while fetching data.' });
+      console.error('Error fetching data of Kid ID: ' + kid_id, err.message);
+      return res.status(500).json({ error: 'An error occurred while fetching data.' });
     }
     else res.json(rows);
   });
@@ -101,7 +102,7 @@ app.get('/get_logs_by_kid_id', (req, res) => {
   db.all('SELECT * FROM logs WHERE kid_id = ?', [req.query.id], (err, rows) => {
     if (err) {
       console.error('Error fetching log data for kid id: ' + req.query.id, err.message);
-      res.status(500).json({ error: 'An error occured while fetching data.' });
+      return res.status(500).json({ error: 'An error occured while fetching data.' });
     }
     else res.json(rows);
   });
@@ -112,7 +113,7 @@ app.get('/get_guardians_by_kid_id', (req, res) => {
   db.all('SELECT * FROM guardians WHERE kid_id = ?', [req.query.id], (err, rows) => {
     if (err) {
       console.error('Error fetching guardian data for kid id: ' + req.query.id, err.message);
-      res.status(500).json({ error: 'An error occured while fetching data.' });
+      return res.status(500).json({ error: 'An error occured while fetching data.' });
     }
     else res.json(rows);
   });
@@ -123,7 +124,7 @@ app.get('/get_log_by_id', (req, res) => {
   db.all('SELECT * FROM logs WHERE log_id = ?', [req.query.id], (err, rows) => {
     if (err) {
       console.error('Error fetching log data for log id: ' + req.query.id, err.message);
-      res.status(500).json({ error: 'An error occured while fetching data.' })
+      return res.status(500).json({ error: 'An error occured while fetching data.' })
     }
     else res.json(rows);
   });
@@ -134,7 +135,7 @@ app.get('/get_guardian_by_id', (req, res) => {
   db.all('SELECT * FROM guardians WHERE guardian_id = ?', [req.query.id], (err, rows) => {
     if (err) {
       console.error('Error fetching gaurdian data for guardian id: ' + req.query.id, err.message);
-      res.status(500).json({ error: 'An error occured while fetching data.' })
+      return res.status(500).json({ error: 'An error occured while fetching data.' })
     }
     else res.json(rows);
   });
@@ -148,15 +149,17 @@ app.get('/get_guardian_by_id', (req, res) => {
 
 // When we want to add a new kid, we use this path. Required - first name, last name. Optionally, we can include a guardian at this stage. <--- LAST PART NEEDS TO BE ADDED.
 app.post('/add_kid', (req, res) => {
-  if (!req.query.first_name || !req.query.last_name) {
-    console.log('Insufficient data to create new kid. First name or Last name is missing.');
-    res.status(500).json({ error: 'Missing data. First Name or Last Name is missing.' });
+  const { first_name, last_name, dob } = req.query;
+
+  if (!first_name || !last_name || !dob) {
+    console.log('Insufficient data to create new kid. First name,Last name, and/or Date of Birth is missing.');
+    return res.status(400).json({ error: 'Missing data. First name,Last name, and/or Date of Birth is missing.' });
   }
   else {
-    db.run('INSERT INTO kids (first_name, last_name, status) VALUES (?, ?, \'Out\')', [req.query.first_name, req.query.last_name], (err) => {
+    db.run('INSERT INTO kids (first_name, last_name, dob) VALUES (?, ?, ?)', [first_name, last_name, dob], (err) => {
       if (err) {
         console.error('Error inserting data to kids.', err.message);
-        res.status(500).json({ error: 'An error occured when trying to insert the data to the database.' });
+        return res.status(500).json({ error: 'An error occured when trying to insert the data to the database.' });
       }
       else {
         res.json({ success: 'Kid successfully added to the database.' })
@@ -167,9 +170,46 @@ app.post('/add_kid', (req, res) => {
 
 // When we want to change the status of a kid (create a NEW LOG), we use this path. It requires the kid ID.
 app.post('/change_kid_status', (req, res) => {
-  if (!req.query.id) res.status(500).json({ error: 'Missing kid ID. Cannot change status.' });
+  const { kid_id } = req.query;
+  // We need a kid ID to change the status of. End here if no kid ID.
+  if (!kid_id) {
+    console.log('Error: No kid ID received.')
+    return res.status(400).json({ error: 'Missing kid ID. Cannot change status.' });
+  }
   else {
-    res.json({ success: 'Kid status successfully updated.' }) // THIS NEEDS TO BE DONE. TO DO TO DO TO DO TO DO TO DO TO DO
+    // We need to find the kids current status. 
+    db.get('SELECT status FROM logs WHERE kid_id = ? AND timestamp = (SELECT MAX(timestamp) FROM logs WHERE kid_id = ?)', [kid_id, kid_id], (err, row) => {
+      if (err) {
+        console.error('Error finding kid\'s current status.', err.message);
+        return res.status(500).json({ error: 'An error occurred when retreiving the kid\'s current status.' });
+      }
+      // Lets make sure we retreived a kid, otherwise the kid might not exist in the database.
+      if (!row) {
+        console.log('Error: No row returned. Kid ID doesn\'t exist');
+        return res.status(400).json({ error: 'An error occurred. The provided kid ID doesn\'t exist in the database.' })
+      }
+      // This never runs, as there are currently no log entries in the database TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DOTO DO TO DOTO DO TO DO 
+      console.log(row)
+      // We want to swap the status to the opposite of the current one.
+      const newStatus = row.status === 'In' ? 'Out' : 'In';
+
+      // Now lets add the new log with the updated status
+      // db.run('INSERT INTO logs(kid_id, status) VALUES ?, ?', [kid_id, newStatus], (err) => {
+      //   if (err) {
+      //     console.error('Error when creating new log.', err.message);
+      //     return res.status(500).json({ error: 'An error occurred when adding the new log.' });
+      //   }
+      //   else {
+      //     // If we successfully added the new log, we need to update the status of the kid in the kids table.
+      //     db.run('UPDATE kids SET status = ? WHERE kid_id = ?', [newStatus, kid_id], (err) => {
+      //       if (err) {
+      //         console.error('Error when updating status of kid.', err.message);
+      //         return res.status(500).json({ error: 'An error occurred when updating the status of ' })
+      //       }
+      //     });
+      //   }
+      // });
+    });
   }
 });
 
@@ -309,7 +349,7 @@ app.patch('/update_kid', (req, res) => {
   });
 });
 
-// When we want to update the details of a log, we use this path.
+// When we want to update the details of a log, we use this path. I don't see this being used much, but just in case...
 app.patch('/update_log', (req, res) => {
 
 });
