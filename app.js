@@ -262,7 +262,7 @@ app.post('/add_guardian', (req, res) => {
 
 // When we want to update the details of a kid, we use this path.
 app.patch('/update_kid', (req, res) => {
-  const { kid_id, first_name, last_name, status } = req.query;
+  const { kid_id, first_name, last_name } = req.query;
 
   // We need a kid id to perform this task. If none is provided, end here.
   if (!kid_id) {
@@ -284,11 +284,6 @@ app.patch('/update_kid', (req, res) => {
   if (last_name) {
     params.push(last_name);
     fields.push('last_name = ?');
-  }
-
-  if (status) {
-    params.push(status);
-    fields.push('status = ?')
   }
 
   // If there are no fields which we are going to update, end here.
@@ -351,6 +346,7 @@ app.patch('/update_kid', (req, res) => {
 
 // When we want to update the details of a log, we use this path. I don't see this being used much, but just in case...
 app.patch('/update_log', (req, res) => {
+  // When thinking about what the client should be able to update, I'm thinking only the timestamp should be updatable.
 
 });
 
