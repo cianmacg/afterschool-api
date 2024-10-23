@@ -41,6 +41,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 /*
 *
 *   GETTER PATHS
+*   Should have added a layer of abstraction here? The DB calls are quite similar, would have reduced work done.  
 *
 */
 
@@ -138,6 +139,7 @@ app.get('/get_guardian_by_id', (req, res) => {
 /*
 *
 *   INSERTER PATHS
+*   Should have added a layer of abstraction here? The DB calls are quite similar, would have reduced work done.  
 *
 */
 
@@ -257,6 +259,7 @@ app.post('/add_guardian', (req, res) => {
 /*
 *
 *   UPDATER PATHS
+*   Should have added a layer of abstraction here? The DB calls are quite similar, would have reduced work done.  
 *
 */
 
@@ -424,6 +427,8 @@ app.patch('/update_log', (req, res) => {
   });
 });
 
+// This updates all entires with the same guardian_id.
+// RE: Relationship. Possible a guardian is the parent of one child, and a different relationship to another?
 // When we want to update the details of a guardian, we use this path.
 app.patch('/update_guardian', (req, res) => {
   const { guardian_id, kid_id, name, phone, email, address, relationship } = req.query;
@@ -530,11 +535,77 @@ app.patch('/update_guardian', (req, res) => {
 /*
 *
 *   DELETER PATHS
+*   Should have added a layer of abstraction here? The DB calls are quite similar, would have reduced work done.  
 *
 */
 
 // When we want to remove a kid from the database, we use this path.
+// We should also be deleting all associated guardians too. TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DO 
 app.delete('/remove_kid', (req, res) => {
+  // We only need a kid_id to remove.
+  const { kid_id } = req.query;
+
+  if (!kid_id) {
+    console.log('No kid ID provided to remove.')
+    return res.status(400).json({ error: 'No kid ID provided. Cannot remove.' });
+  }
+
+  // We need to make sure the kid_id exists first
+  db.get('SELECT kid_id FROM kids WHERE kid_id = ?', [kid_id], (err, row) => {
+    if (err) {
+      console.error('Error when trying to find kid ID.', err.message);
+      return res.status(500).json({ error: 'An error occurred when trying to find the kid ID.' });
+    }
+
+    if (!row) {
+      console.log('No kid matching ID: ' + kid_id);
+      return res.status(400).json({ error: 'An error occurred when finding kid. The provided kid ID does not exist in the database.' });
+    }
+
+    // We may delete a kid someone else is trying to update? Should protect against this with locks?
+    db.serialize(() => {
+      // Begin the locking.
+      db.run('BEGIN TRANSACTION;', (err) => {
+        if (err) {
+          console.error('Error occurred beginning transaction.', err.message);
+          return res.status(500).json({ error: 'An error occurred while beginning the transaction.' });
+        }
+        else {
+          // Execute the removal of the kid ID from table kids.
+          db.run('DELETE FROM kids WHERE kid_id = ?', [kid_id], (err) => {
+            if (err) {
+              console.error('Error occurred when removing kid from database.');
+              // If there was an error, we need to rollback the transaction.
+              db.run('ROLLBACK;', (rollbackErr) => {
+                if (rollbackErr) console.error('Error occurred during rollback.', rollbackErr.message);
+              });
+              return res.status(500).json({ error: 'An error occurred while removing the kid from the database.' });
+            }
+            else {
+              // Commit the transaction.
+              db.run('COMMIT;', (err) => {
+                if (err) {
+                  console.error('Error occurred during commit.', err.message);
+                  // If there was an error, we need to rollback the transaction.
+                  db.run('ROLLBACK;', (rollbackErr) => {
+                    if (rollbackErr) console.error('Error occurred during rollback.', rollbackErr.message);
+                  });
+                  return res.status(500).json({ error: 'An error occurred during the committing of the transaction.' });
+                }
+                else {
+                  // Inform the user of the success.
+                  return res.json({ success: 'The kid ID was successfully removed.' });
+                }
+              });
+            }
+          });
+        }
+      });
+    });
+  });
+
+
+
 
 });
 
