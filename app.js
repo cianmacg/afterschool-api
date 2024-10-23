@@ -177,38 +177,58 @@ app.post('/change_kid_status', (req, res) => {
     return res.status(400).json({ error: 'Missing kid ID. Cannot change status.' });
   }
   else {
-    // We need to find the kids current status. 
-    db.get('SELECT status FROM logs WHERE kid_id = ? AND timestamp = (SELECT MAX(timestamp) FROM logs WHERE kid_id = ?)', [kid_id, kid_id], (err, row) => {
-      if (err) {
-        console.error('Error finding kid\'s current status.', err.message);
-        return res.status(500).json({ error: 'An error occurred when retreiving the kid\'s current status.' });
-      }
-      // Lets make sure we retreived a kid, otherwise the kid might not exist in the database.
-      if (!row) {
-        console.log('Error: No row returned. Kid ID doesn\'t exist');
-        return res.status(400).json({ error: 'An error occurred. The provided kid ID doesn\'t exist in the database.' })
-      }
-      // This never runs, as there are currently no log entries in the database TO DO TO DO TO DO TO DO TO DO TO DO TO DO TO DOTO DO TO DOTO DO TO DO 
-      console.log(row)
-      // We want to swap the status to the opposite of the current one.
-      const newStatus = row.status === 'In' ? 'Out' : 'In';
+    // It is possible 2 people may try to change the status of the same kid at the same time. We need to protect agains race conditions.
+    // We will do this with serialization and transactions.
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION;', (err) => {
+        if (err) {
+          console.error('Error when beginning transaction.', err.message);
+          return res.status(500).json({ error: 'An error occurred when beginning the transaction.' })
+        }
 
-      // Now lets add the new log with the updated status
-      // db.run('INSERT INTO logs(kid_id, status) VALUES ?, ?', [kid_id, newStatus], (err) => {
-      //   if (err) {
-      //     console.error('Error when creating new log.', err.message);
-      //     return res.status(500).json({ error: 'An error occurred when adding the new log.' });
-      //   }
-      //   else {
-      //     // If we successfully added the new log, we need to update the status of the kid in the kids table.
-      //     db.run('UPDATE kids SET status = ? WHERE kid_id = ?', [newStatus, kid_id], (err) => {
-      //       if (err) {
-      //         console.error('Error when updating status of kid.', err.message);
-      //         return res.status(500).json({ error: 'An error occurred when updating the status of ' })
-      //       }
-      //     });
-      //   }
-      // });
+        // We need to find the kids current status. 
+        db.get('SELECT status FROM logs WHERE kid_id = ? AND timestamp = (SELECT MAX(timestamp) FROM logs WHERE kid_id = ?)', [kid_id, kid_id], (err, row) => {
+          if (err) {
+            console.error('Error finding kid\'s current status.', err.message);
+            return res.status(500).json({ error: 'An error occurred when retreiving the kid\'s current status.' });
+          }
+          // Lets make sure we retreived a kid, otherwise the kid might not exist in the database.
+          if (!row) {
+            console.log('Error: No row returned. Kid ID doesn\'t exist');
+            return res.status(400).json({ error: 'An error occurred. The provided kid ID doesn\'t exist in the database.' })
+          }
+
+          // We want to swap the status to the opposite of the current one.
+          const newStatus = row.status === 'In' ? 'Out' : 'In';
+
+          // Now lets add the new log with the updated status. The time will be logged by the database.
+          db.run('INSERT INTO logs(kid_id, status) VALUES (?, ?)', [kid_id, newStatus], (err) => {
+            if (err) {
+              console.error('Error when creating new log.', err.message);
+              // If an error occurred during rollback, log it.
+              db.run('ROLLBACK;', (rollbackErr) => {
+                if (rollbackErr) console.error('An error occurred during rollback:', rollbackErr.message);
+              });
+              return res.status(500).json({ error: 'An error occurred when adding the new log.' });
+            }
+            else {
+              db.run('COMMIT;', (err) => {
+                if (err) {
+                  console.error('Error when commiting transaction:', err.message);
+                  db.run('ROLLBACK;', (rollbackErr) => {
+                    // If an error occurs during rollback, log it.
+                    if (rollbackErr) console.error('Error occurred during rollback:', rollbackErr.message);
+                    return res.status(500).json({ error: 'An error occurred during rollback.' })
+                  });
+                  return res.status(500).json({ error: 'An error occurred during commit.' })
+                }
+              });
+              // The status change has been completed and logged. Report this to the client.
+              res.json({ success: 'Kid status change successfully logged.' });
+            }
+          });
+        });
+      });
     });
   }
 });
@@ -238,9 +258,6 @@ app.post('/add_guardian', (req, res) => {
           db.get('SELECT MAX(guardian_id) AS maxGuardianId FROM guardians', [], (err, row) => {
             if (err) {
               console.error('Error fetching MAX guardian id.', err.message);
-              db.run('ROLLBACK;', (rollbackErr) => {
-                if (rollbackErr) console.error('Error rolling back transaction:', rollbackErr.message);
-              });
               return res.status(500).json({ error: 'An error occurred when obtaining the new guardian ID.' })
             }
             else {
@@ -389,16 +406,25 @@ function add_guardian(params, res, is_locked) {
       console.error('Error inserting data to database.', err.message);
       if (is_locked) {
         db.run('ROLLBACK;', (rollbackErr) => {
+          // If the rollback has failed, log it.
           if (rollbackErr) console.error('Error rolling back transaction:', rollbackErr.message);
         });
       }
       res.status(500).json({ error: 'An error occured while inserting data into the database.' })
     }
     else {
+      // If the call came from the '/add_gaurdian' path and haven't passed a specific guardian_id, we have begun a transcation to combat race conditions.
+      // We will need to commit the transaction.
       if (is_locked) {
         db.run('COMMIT;', (commitErr) => {
           if (commitErr) {
             console.error('Error committing transaction:', commitErr.message);
+            db.run('ROLLBACK;', rollbackErr => {
+              // If the rollback has failed, log it.
+              if (rollbackErr) {
+                console.error('Error during rollback: ', rollbackErr.message);
+              }
+            });
             res.status(500).json({ error: 'An error occurred while commiting the transaction.' })
           }
           else res.json({ success: 'Guardian successfully added to the database.' })

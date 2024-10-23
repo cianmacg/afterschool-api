@@ -6,7 +6,7 @@ import sqlite3
 connection = sqlite3.connect('../data.db')
 cursor = connection.cursor()
 
-cursor.execute("DROP TABLE kids")
+# cursor.execute("DROP TABLE kids")
 # cursor.execute("DROP TABLE guardians")
 # cursor.execute("DROP TABLE logs")
 
@@ -17,9 +17,9 @@ createGuardians = """CREATE TABLE IF NOT EXISTS
 guardians(guardian_id INTEGER NOT NULL, kid_id INTEGER NOT NULL, name TEXT, phone TEXT, email TEXT, address TEXT, relationship TEXT, FOREIGN KEY(kid_id) REFERENCES kids(kid_id), CONSTRAINT PK_guardian PRIMARY KEY (guardian_id, kid_id) )"""
 
 createLogs = """CREATE TABLE IF NOT EXISTS
-logs(log_id INTEGER UNIQUE PRIMARY KEY NOT NULL, kid_id INTEGER, status TEXT, timestamp TIMESTAMP DEFUALT CURRENT_TIMESTAMP, FOREIGN KEY(kid_id) REFERENCES kids(kid_id))"""
+logs(log_id INTEGER UNIQUE PRIMARY KEY NOT NULL, kid_id INTEGER, status TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(kid_id) REFERENCES kids(kid_id))"""
 
-cursor.execute(createKids)
+# cursor.execute(createKids)
 # cursor.execute(createGuardians)
 # cursor.execute(createLogs)
 
@@ -37,6 +37,8 @@ cursor.execute(createKids)
 # cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (2, 1,'Paul Smith', '0918374562', 'paulsmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
 # cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (2, 2,'Paul Smith', '0918374562', 'paulsmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
 # cursor.execute("INSERT INTO guardians(guardian_id, kid_id, name, phone, email, address, relationship) VALUES (2, 3,'Paul Smith', '0918374562', 'paulsmith@example.com', 'Somewhere, Someplace, Ireland', 'Parent')")
+
+# cursor.execute("INSERT INTO logs(kid_id, status) VALUES (1, 'In')")
 
 cursor.close()
 connection.commit()
