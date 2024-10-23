@@ -346,8 +346,82 @@ app.patch('/update_kid', (req, res) => {
 
 // When we want to update the details of a log, we use this path. I don't see this being used much, but just in case...
 app.patch('/update_log', (req, res) => {
-  // When thinking about what the client should be able to update, I'm thinking only the timestamp should be updatable.
+  // When thinking about what the client should be able to update, I'm thinking the timestamp and kid ID should be updatable.
+  const { log_id, kid_id, timestamp } = req.query;
 
+  let sqlQuery = 'UPDATE logs SET ';
+  const fields = [];
+  const params = [];
+
+  if (!log_id) {
+    console.log('No log ID provided. Cannot update.')
+    return res.status(400).json({ error: 'No log ID provided. Cannot update.' });
+  }
+
+  if (kid_id) {
+    fields.push('kid_id = ?');
+    params.push(kid_id);
+  }
+
+  if (timestamp) {
+    fields.push('timestamp = ?');
+    params.push(timestamp);
+  }
+
+  if (fields.length === 0) {
+    console.log('No field to update.');
+    return res.status(400).json({ error: 'No field to update provided.' });
+  }
+
+  sqlQuery += fields;
+  sqlQuery += ' WHERE log_id = ?'
+  params.push(log_id)
+
+  // We need to verify that the log id exists. If so, we can edit it.
+  db.get('SELECT log_id FROM logs WHERE log_id = ?', [log_id], (err, row) => {
+    if (err) {
+      console.error('Error occurred getting log.', err.message);
+      return res.status(500).json({ error: 'An error occurred when getting log.' });
+    }
+    if (!row) {
+      return res.status(400).json({ error: 'An error occurred when getting log. Log ID does not exist in database.' })
+    }
+    else {
+      // The log exists, we can begin editing it.
+      // Since 2 people may try to update the same log at the same time, we should protect against race conditions (Maybe? Doesn't hurt at this scale).
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION;', (err) => {
+          if (err) {
+            console.error('Error when beginning transaction.', err.message);
+            return res.status(500).json({ error: 'An error occurred when beginning the transaction.' });
+          }
+          else {
+            db.run(sqlQuery, params, (err) => {
+              if (err) {
+                console.error('Error occurred updating log.', err.message);
+                db.run('ROLLBACK;', (rollbackErr) => {
+                  if (rollbackErr) console.error('Error during rollback.', rollbackErr.message);
+                });
+                return res.status(500).json({ error: 'An error occurred while updating log.' });
+              }
+              else {
+                db.run('COMMIT;', (err) => {
+                  if (err) {
+                    console.error('Error during commit.', err.message);
+                    db.run('ROLLBACK;', (rollbackErr) => {
+                      if (rollbackErr) console.error('Error during rollback.', rollbackErr.message);
+                    });
+                    return res.status(500).json('An error occurred during the commit.');
+                  }
+                  return res.json({ success: 'Log successfully updated.' });
+                });
+              }
+            });
+          }
+        });
+      });
+    }
+  });
 });
 
 // When we want to update the details of a guardian, we use this path.
