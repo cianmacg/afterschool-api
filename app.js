@@ -186,41 +186,30 @@ app.post('/change_kid_status', (req, res) => {
             console.error('Error finding kid\'s current status.', err.message);
             return res.status(500).json({ error: 'An error occurred when retreiving the kid\'s current status.' });
           }
-          // Lets make sure we retreived a kid, otherwise the kid might not exist in the database.
+          // Lets make sure we retreived a kid. If not, the kid may not exist, or this could be their first time being logged.
           if (!row) {
-            console.log('Error: No row returned. Kid ID doesn\'t exist');
-            return res.status(400).json({ error: 'An error occurred. The provided kid ID doesn\'t exist in the database.' })
+            db.get('SELECT kid_id FROM kids WHERE kid_id = ?', [kid_id], (err, kid_row) => {
+              if (err) {
+                console.error('Error occurred when searching for kid ID.', err.message);
+                return res.status(500).json({ error: 'An error occurred when searching for kid ID.' });
+              }
+
+              if (!kid_row) {
+                console.log('Kid ID does not exist.');
+                return res.status(400).json({ error: 'The provided kid ID does not exist.' });
+              }
+
+              // The first time we are changing the kids status, they should be logged as 'In'. (I.e. with no status the kid is considered 'Out').
+              change_kid_status(kid_id, 'In', res);
+            });
           }
+          else {
+            // We want to swap the status to the opposite of the current one.
+            const newStatus = row.status === 'In' ? 'Out' : 'In';
 
-          // We want to swap the status to the opposite of the current one.
-          const newStatus = row.status === 'In' ? 'Out' : 'In';
-
-          // Now lets add the new log with the updated status. The time will be logged by the database.
-          db.run('INSERT INTO logs(kid_id, status) VALUES (?, ?)', [kid_id, newStatus], (err) => {
-            if (err) {
-              console.error('Error when creating new log.', err.message);
-              // If an error occurred during rollback, log it.
-              db.run('ROLLBACK;', (rollbackErr) => {
-                if (rollbackErr) console.error('An error occurred during rollback:', rollbackErr.message);
-              });
-              return res.status(500).json({ error: 'An error occurred when adding the new log.' });
-            }
-            else {
-              db.run('COMMIT;', (err) => {
-                if (err) {
-                  console.error('Error when commiting transaction:', err.message);
-                  db.run('ROLLBACK;', (rollbackErr) => {
-                    // If an error occurs during rollback, log it.
-                    if (rollbackErr) console.error('Error occurred during rollback:', rollbackErr.message);
-                    return res.status(500).json({ error: 'An error occurred during rollback.' })
-                  });
-                  return res.status(500).json({ error: 'An error occurred during commit.' })
-                }
-              });
-              // The status change has been completed and logged. Report this to the client.
-              res.json({ success: 'Kid status change successfully logged.' });
-            }
-          });
+            // Now lets add the new log with the updated status. The time will be logged by the database.
+            change_kid_status(kid_id, newStatus, res);
+          }
         });
       });
     });
@@ -431,6 +420,36 @@ function add_guardian(params, res, is_locked) {
   });
 }
 
+// Moved this part out of the path function, we it will make things more convenient.
+// Can only be called from within a transaction.
+function change_kid_status(kid_id, newStatus, res) {
+  // Now lets add the new log with the updated status. The time will be logged by the database.
+  db.run('INSERT INTO logs(kid_id, status) VALUES (?, ?)', [kid_id, newStatus], (err) => {
+    if (err) {
+      console.error('Error when creating new log.', err.message);
+      // If an error occurred during rollback, log it.
+      db.run('ROLLBACK;', (rollbackErr) => {
+        if (rollbackErr) console.error('An error occurred during rollback:', rollbackErr.message);
+      });
+      return res.status(500).json({ error: 'An error occurred when adding the new log.' });
+    }
+    else {
+      db.run('COMMIT;', (err) => {
+        if (err) {
+          console.error('Error when commiting transaction:', err.message);
+          db.run('ROLLBACK;', (rollbackErr) => {
+            // If an error occurs during rollback, log it.
+            if (rollbackErr) console.error('Error occurred during rollback:', rollbackErr.message);
+            return res.status(500).json({ error: 'An error occurred during rollback.' })
+          });
+          return res.status(500).json({ error: 'An error occurred during commit.' })
+        }
+      });
+      // The status change has been completed and logged. Report this to the client.
+      return res.json({ success: 'Kid status change successfully logged.' });
+    }
+  });
+}
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
   next(createError(404));
