@@ -373,7 +373,7 @@ app.patch('/update_log', (req, res) => {
     return res.status(400).json({ error: 'No field to update provided.' });
   }
 
-  sqlQuery += fields;
+  sqlQuery += fields.join(', ');
   sqlQuery += ' WHERE log_id = ?'
   params.push(log_id)
 
@@ -425,8 +425,106 @@ app.patch('/update_log', (req, res) => {
 });
 
 // When we want to update the details of a guardian, we use this path.
-app.patch('/update_guadian', (req, res) => {
+app.patch('/update_guardian', (req, res) => {
+  const { guardian_id, kid_id, name, phone, email, address, relationship } = req.query;
 
+  if (!guardian_id) {
+    console.log('Error: No guardian ID provided.');
+    return res.status(400).json({ error: 'An error occurred. No guardian ID was provided.' });
+  }
+
+  let sqlQuery = 'UPDATE guardians SET ';
+  const fields = [];
+  const params = [];
+
+  if (kid_id) {
+    fields.push('kid_id = ?');
+    params.push(kid_id);
+  }
+
+  if (name) {
+    fields.push('name = ?');
+    params.push(name);
+  }
+
+  if (phone) {
+    fields.push('phone = ?');
+    params.push(phone);
+  }
+
+  if (email) {
+    fields.push('email = ?');
+    params.push(email);
+  }
+
+  if (address) {
+    fields.push('address = ?');
+    params.push(address);
+  }
+
+  if (relationship) {
+    fields.push('relationship = ?');
+    params.push(relationship);
+  }
+
+  if (fields.length === 0) {
+    console.log('No field provided to update.');
+    return res.status(400).json({ error: 'No fields provided to update.' });
+  }
+
+  sqlQuery += fields.join(', ');
+  sqlQuery += ' WHERE guardian_id = ?';
+  params.push(guardian_id);
+
+  // First lets make sure the guardian_id actually exists, then we can proceed with updating it.
+  db.get('SELECT guardian_id FROM guardians WHERE guardian_id = ?', [guardian_id], (err, row) => {
+    if (err) {
+      console.error('Error checking for guardian_id in the database.', err.message);
+      return res.status(500).json({ error: 'An error occurred when checking for the guardian_id in the database.' })
+    }
+
+    // If row is empty, it means the provided guardian_id doesn't exist, and there is nothing to update.
+    if (!row) {
+      console.log('The gaurdian ID to update does not exist.');
+      return res.status(400).json({ error: 'The guardian ID provided does not exist in the database.' });
+    }
+
+    else {
+      // Since 2 people may attempt to edit the guardian at the same time, we should protect against race conditions.
+      // Not sure if this is really necessary here, but I'm going to do it to be safe.
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION;', (err) => {
+          if (err) {
+            console.error('Error beginning transaction.', err.message);
+            return res.status(500).json({ error: 'An error occurred beginning the transaction.' });
+          }
+          else {
+            console.log(sqlQuery);
+            db.run(sqlQuery, params, (err) => {
+              if (err) {
+                console.error('Error updating guardian details.', err.message);
+                db.run('ROLLBACK;', (rollbackErr) => {
+                  if (rollbackErr) console.error('Error while attempting rollback.', rollbackErr.message);
+                });
+                return res.status(500).json({ error: 'An error occurred while updating the guardian details.' });
+              }
+              else {
+                db.run('COMMIT;', (err) => {
+                  if (err) {
+                    console.error('Error while committing transaction.', err.message);
+                    return res.status(500).json({ error: 'An error occurred while commiting the transaction.' });
+                  }
+                  else {
+                    return res.json({ success: 'Guardian successfully updated.' })
+                  }
+                });
+              }
+            });
+          }
+        });
+      });
+    }
+  });
 });
 
 /*
